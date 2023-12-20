@@ -5,6 +5,7 @@ module Fastlane
         command = []
         command << "curl"
         command << verbose(params)
+        command << "--fail"
         command += ssl_options(params)
         command += proxy_options(params)
         command += upload_options(params)
@@ -138,11 +139,12 @@ module Fastlane
           FastlaneCore::ConfigItem.new(key: :password,
                                        env_name: "FL_NEXUS_PASSWORD",
                                        description: "Nexus password",
+                                       sensitive: true,
                                        optional: false),
           FastlaneCore::ConfigItem.new(key: :ssl_verify,
                                        env_name: "FL_NEXUS_SSL_VERIFY",
                                        description: "Verify SSL",
-                                       is_string: false,
+                                       type: Boolean,
                                        default_value: true,
                                        optional: true),
           FastlaneCore::ConfigItem.new(key: :nexus_version,
@@ -160,7 +162,7 @@ module Fastlane
           FastlaneCore::ConfigItem.new(key: :verbose,
                                        env_name: "FL_NEXUS_VERBOSE",
                                        description: "Make detailed output",
-                                       is_string: false,
+                                       type: Boolean,
                                        default_value: false,
                                        optional: true),
           FastlaneCore::ConfigItem.new(key: :proxy_username,

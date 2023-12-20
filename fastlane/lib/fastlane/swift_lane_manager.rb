@@ -5,22 +5,13 @@ module Fastlane
   class SwiftLaneManager < LaneManagerBase
     # @param lane_name The name of the lane to execute
     # @param parameters [Hash] The parameters passed from the command line to the lane
-    # @param env Dot Env Information
-    def self.cruise_lane(lane, parameters = nil, env = nil, disable_runner_upgrades: false, swift_server_port: nil)
+    def self.cruise_lane(lane, parameters = nil, disable_runner_upgrades: false, swift_server_port: nil)
       UI.user_error!("lane must be a string") unless lane.kind_of?(String) || lane.nil?
       UI.user_error!("parameters must be a hash") unless parameters.kind_of?(Hash) || parameters.nil?
 
       # Sets environment variable and lane context for lane name
       ENV["FASTLANE_LANE_NAME"] = lane
       Actions.lane_context[Actions::SharedValues::LANE_NAME] = lane
-
-      # xcodeproj has a bug in certain versions that causes it to change directories
-      # and not return to the original working directory
-      # https://github.com/CocoaPods/Xcodeproj/issues/426
-      # Setting this environment variable causes xcodeproj to work around the problem
-      ENV["FORK_XCODE_WRITING"] = "true"
-
-      Fastlane::Helper::DotenvHelper.load_dot_env(env)
 
       started = Time.now
       e = nil
@@ -41,7 +32,7 @@ module Fastlane
         # wait on socket_thread to be in ready state, then start the runner thread
         self.cruise_swift_lane_in_thread(lane, parameters, swift_server_port)
 
-        socket_thread.join
+        socket_thread.value
       rescue Exception => ex # rubocop:disable Lint/RescueException
         e = ex
       end
@@ -82,7 +73,10 @@ module Fastlane
 
     def self.display_lanes
       self.ensure_runner_built!
-      Actions.sh(%(#{FastlaneCore::FastlaneFolder.swift_runner_path} lanes))
+      return_value = Actions.sh(%(#{FastlaneCore::FastlaneFolder.swift_runner_path} lanes))
+      if FastlaneCore::Globals.verbose?
+        UI.message("runner output: ".yellow + return_value)
+      end
     end
 
     def self.cruise_swift_lane_in_thread(lane, parameters = nil, swift_server_port)
@@ -102,11 +96,16 @@ module Fastlane
       parameter_string += " swiftServerPort #{swift_server_port}"
 
       return Thread.new do
-        Actions.sh(%(#{FastlaneCore::FastlaneFolder.swift_runner_path} lane #{lane}#{parameter_string} > /dev/null))
+        if FastlaneCore::Globals.verbose?
+          return_value = Actions.sh(%(#{FastlaneCore::FastlaneFolder.swift_runner_path} lane #{lane}#{parameter_string}))
+          UI.message("runner output: ".yellow + return_value)
+        else
+          Actions.sh(%(#{FastlaneCore::FastlaneFolder.swift_runner_path} lane #{lane}#{parameter_string} > /dev/null))
+        end
       end
     end
 
-    def self.swap_paths_in_target(target: nil, file_refs_to_swap: nil, expected_path_to_replacement_path_tuples: nil)
+    def self.swap_paths_in_target(file_refs_to_swap: nil, expected_path_to_replacement_path_tuples: nil)
       made_project_updates = false
       file_refs_to_swap.each do |file_ref|
         expected_path_to_replacement_path_tuples.each do |preinstalled_config_relative_path, user_config_relative_path|
@@ -198,14 +197,12 @@ module Fastlane
 
       # Swap in all new user supplied configs into the project
       project_modified = swap_paths_in_target(
-        target: runner_target,
         file_refs_to_swap: target_file_refs,
         expected_path_to_replacement_path_tuples: new_user_tool_file_paths
       )
 
       # Swap out any configs the user has removed, inserting fastlane defaults
       project_modified = swap_paths_in_target(
-        target: runner_target,
         file_refs_to_swap: target_file_refs,
         expected_path_to_replacement_path_tuples: user_tool_files_possibly_removed
       ) || project_modified
