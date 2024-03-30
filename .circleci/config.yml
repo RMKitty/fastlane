@@ -103,6 +103,7 @@ jobs:
       - run:
           name: bundle exec fastlane execute_tests
           command: |
+            ulimit -n 65536 # allows us to stress test the system if we want
             bundle exec fastlane snapshot reset_simulators --force
             RUBYOPT=<< parameters.ruby_opt >> bundle exec fastlane execute_tests
       - *cache_save_rubocop
@@ -308,6 +309,10 @@ workflows:
           name: 'Execute tests on macOS (Xcode 15.2.0, Ruby 3.2)'
           xcode_version: '15.2.0'
           ruby_version: '3.2'
+      - tests_macos:
+          name: 'Execute tests on macOS (Xcode 15.3, Ruby 3.3)'
+          xcode_version: '15.3'
+          ruby_version: '3.3'
           ruby_opt: -W:deprecated
       - tests_ubuntu:
           name: 'Execute tests on Ubuntu'

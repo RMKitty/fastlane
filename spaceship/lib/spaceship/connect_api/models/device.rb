@@ -31,8 +31,9 @@ module Spaceship
         APPLE_TV = "APPLE_TV"
         MAC = "MAC"
 
-        # As of 2022-11-12, this is not officially supported by App Store Connect API
+        # As of 2024-03-08, this is not _officially_ supported by App Store Connect API (according to API docs)—yet still used in the API responses
         APPLE_SILICON_MAC = "APPLE_SILICON_MAC"
+        INTEL_MAC = "INTEL_MAC"
       end
 
       module Status
@@ -68,7 +69,7 @@ module Spaceship
         device_platform = case platform
                           when :osx, :macos, :mac
                             Spaceship::ConnectAPI::Platform::MAC_OS
-                          when :ios
+                          when :ios, :tvos
                             Spaceship::ConnectAPI::Platform::IOS
                           when :catalyst
                             Spaceship::ConnectAPI::Platform::MAC_OS
@@ -94,7 +95,9 @@ module Spaceship
             ]
           when :macos, :catalyst
             [
-              Spaceship::ConnectAPI::Device::DeviceClass::MAC
+              Spaceship::ConnectAPI::Device::DeviceClass::MAC,
+              Spaceship::ConnectAPI::Device::DeviceClass::APPLE_SILICON_MAC,
+              Spaceship::ConnectAPI::Device::DeviceClass::INTEL_MAC
             ]
           else
             []
@@ -106,9 +109,9 @@ module Spaceship
         end
 
         filter = {
-          status: Spaceship::ConnectAPI::Device::Status::ENABLED,
-          platform: device_platforms.uniq.join(',')
+          status: Spaceship::ConnectAPI::Device::Status::ENABLED
         }
+        filter[:platform] = device_platforms.uniq.join(',') unless device_platforms.empty?
 
         devices = Spaceship::ConnectAPI::Device.all(
           client: client,
